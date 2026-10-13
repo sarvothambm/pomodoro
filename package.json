@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Minimalist Dark Mode Pomodoro App with volume control, acoustic chime, background persistence, and PWA support",
   "scripts": {
-    "build": "echo 'Static web build ready'",
     "start": "npx serve .",
     "dev": "npx serve .",
     "desktop": "electron ."
