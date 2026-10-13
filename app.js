@@ -397,8 +397,8 @@
         shortBreakDuration: 5 * 60, // 5 min default
         longBreakDuration: 15 * 60, // 15 min default
         targetIntervals: 4, // 4 work sessions, 3 short breaks, then 15m long break
-        autoStartBreaks: false,
-        autoStartFocus: false
+        autoStartBreaks: true, // Seamless uninterrupted flow: automatically starts breaks!
+        autoStartFocus: true  // Automatically starts next focus session after break!
       };
 
       this.loadSettings();
@@ -430,11 +430,19 @@
 
     loadSettings() {
       try {
-        const saved = localStorage.getItem('pulse_pomodoro_config_v1');
-        if (saved) {
-          const parsed = JSON.parse(saved);
+        const savedV2 = localStorage.getItem('pulse_pomodoro_config_v2');
+        if (savedV2) {
+          const parsed = JSON.parse(savedV2);
           this.config = { ...this.config, ...parsed };
+        } else {
+          const savedV1 = localStorage.getItem('pulse_pomodoro_config_v1');
+          if (savedV1) {
+            const parsedV1 = JSON.parse(savedV1);
+            this.config = { ...this.config, ...parsedV1, autoStartBreaks: true, autoStartFocus: true };
+          }
         }
+        if (this.config.autoStartBreaks === undefined) this.config.autoStartBreaks = true;
+        if (this.config.autoStartFocus === undefined) this.config.autoStartFocus = true;
       } catch (e) {
         console.warn('Could not parse settings', e);
       }
@@ -442,6 +450,7 @@
 
     saveSettings() {
       try {
+        localStorage.setItem('pulse_pomodoro_config_v2', JSON.stringify(this.config));
         localStorage.setItem('pulse_pomodoro_config_v1', JSON.stringify(this.config));
       } catch (e) {
         console.error('Failed to save settings', e);
@@ -901,8 +910,9 @@
     }
 
     skipSession() {
+      const wasRunning = this.isRunning;
       this.stopTimer();
-      this.completeSession(true); // mark completed / transition
+      this.completeSession(true, wasRunning); // mark completed / transition
     }
 
     handleTick() {
@@ -922,12 +932,12 @@
     }
 
     // THE CRITICAL WORKFLOW SPECIFIED BY THE USER:
-    // 1. Work Session ends -> 1 BEEP -> 5 min break (editable).
-    // 2. 5 min break ends -> 1 BEEP -> Work Session.
+    // 1. Work Session ends -> 1 BEEP -> Automatically start 5 min break.
+    // 2. 5 min break ends -> 1 BEEP -> Automatically start Work Session.
     // 3. Repeats for 3 intervals (round 1 work/break, round 2 work/break, round 3 work/break).
-    // 4. On completing the 4th interval (work session 4, after 3 short breaks) -> TWICE BEEP -> 15 min long break!
-    // 5. After 15 min long break -> 1 BEEP -> resets to interval 1.
-    completeSession(isSkipped = false) {
+    // 4. On completing the 4th interval (work session 4, after 3 short breaks) -> TWICE BEEP -> Automatically start 15 min long break!
+    // 5. After 15 min long break -> 1 BEEP -> Automatically restarts interval 1.
+    completeSession(isSkipped = false, wasRunning = false) {
       this.system.vibrate([280, 120, 280]);
       const finishedMode = this.mode;
       const finishedMinutes = this.totalDuration / 60;
@@ -938,11 +948,13 @@
         this.renderDashboard();
       }
 
+      // Automatically chain into next session without requiring manual Start click
+      const shouldAutoRun = !isSkipped || wasRunning;
+
       if (finishedMode === 'work') {
         // Did we just finish interval 4 (or config.targetIntervals)?
         if (this.round >= this.config.targetIntervals) {
-          // USER SPECIFICATION:
-          // "later twice beep and 15 min long break after 3 short breaks"
+          // USER SPECIFICATION: 4th interval finished -> TWICE BEEP -> 15 min long break
           this.audio.playBeep(2); // TWICE BEEP!
           this.system.notify(
             '🌟 4 Intervals Completed! Long Break Time',
@@ -954,13 +966,12 @@
           this.totalDuration = this.config.longBreakDuration;
           this.timeRemaining = this.config.longBreakDuration;
 
-          if (this.config.autoStartBreaks) {
+          // Seamlessly auto-start long break
+          if (shouldAutoRun || this.config.autoStartBreaks !== false) {
             this.startTimer();
           }
         } else {
-          // Standard interval finished (1, 2, or 3)
-          // USER SPECIFICATION:
-          // "when i start timer for specified length like 25 or 30 min after a beep sound comes, after that 5 min break"
+          // Standard interval finished (1, 2, or 3) -> 1 single clean beep -> 5 min short break
           this.audio.playBeep(1); // 1 single clean beep
           this.system.notify(
             `🔔 Focus Interval ${this.round} Complete`,
@@ -972,14 +983,13 @@
           this.totalDuration = this.config.shortBreakDuration;
           this.timeRemaining = this.config.shortBreakDuration;
 
-          if (this.config.autoStartBreaks) {
+          // Seamlessly auto-start short break
+          if (shouldAutoRun || this.config.autoStartBreaks !== false) {
             this.startTimer();
           }
         }
       } else if (finishedMode === 'shortBreak') {
         // Short break ended -> Single beep -> advance round -> Work session
-        // USER SPECIFICATION:
-        // "after 5 min another beep again for 3 intervals"
         this.audio.playBeep(1); // 1 single clean beep
         this.round += 1;
 
@@ -992,7 +1002,8 @@
         this.totalDuration = this.config.workDuration;
         this.timeRemaining = this.config.workDuration;
 
-        if (this.config.autoStartFocus) {
+        // Seamlessly auto-start next focus session
+        if (shouldAutoRun || this.config.autoStartFocus !== false) {
           this.startTimer();
         }
       } else if (finishedMode === 'longBreak') {
@@ -1009,7 +1020,8 @@
         this.totalDuration = this.config.workDuration;
         this.timeRemaining = this.config.workDuration;
 
-        if (this.config.autoStartFocus) {
+        // Seamlessly auto-start fresh focus session
+        if (shouldAutoRun || this.config.autoStartFocus !== false) {
           this.startTimer();
         }
       }
