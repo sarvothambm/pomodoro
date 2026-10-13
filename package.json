@@ -1,0 +1,24 @@
+{
+  "name": "pulse-pomodoro",
+  "version": "1.0.0",
+  "description": "Minimalist Dark Mode Pomodoro App with volume control, acoustic chime, background persistence, and PWA support",
+  "scripts": {
+    "build": "echo 'Static web build ready'",
+    "start": "npx serve .",
+    "dev": "npx serve .",
+    "desktop": "electron ."
+  },
+  "keywords": [
+    "pomodoro",
+    "minimalist",
+    "timer",
+    "pwa",
+    "dark-mode",
+    "shader"
+  ],
+  "author": "Antigravity",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^44.7.0"
+  }
+}

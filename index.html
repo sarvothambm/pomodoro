@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Pulse Pomodoro - Minimalist Focus Timer & Acoustic Chime</title>
+  <meta name="description" content="A minimalist dark mode Pomodoro timer with volume controls, background persistence, acoustic chime, and system tray integration." />
+  <meta name="theme-color" content="#0e0a16" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="icon" type="image/png" href="icon.png" />
+  <link rel="apple-touch-icon" href="icon.png" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- Mesmerizing 3D Shader Gradient Background Canvas -->
+  <div id="shader-bg-container">
+    <canvas id="shader-canvas"></canvas>
+    <div id="shader-overlay"></div>
+  </div>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="brand-section">
+      <div class="brand-logo-ring"></div>
+      <span class="brand-name">Pulse Pomodoro</span>
+      <span class="brand-badge" id="desktop-tray-status">
+        <span class="dot-online"></span> Background Ready
+      </span>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs">
+      <button class="tab-btn active" id="nav-timer">
+        <span>⏱</span> Timer
+      </button>
+      <button class="tab-btn" id="nav-dashboard">
+        <span>📊</span> Dashboard
+      </button>
+    </nav>
+
+    <!-- Header Actions -->
+    <div class="header-actions">
+      <button class="icon-btn tray-btn" id="btn-minimize-tray" title="Minimize to System Tray" style="display:none;">
+        <span>⏏</span> Tray
+      </button>
+      <button class="icon-btn" id="nav-settings" title="Preferences">
+        ⚙
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Content Area -->
+  <main class="main-wrapper">
+
+    <!-- Interactive System Permission Banner -->
+    <section class="permission-card" id="permission-card">
+      <div class="permission-header">
+        <div class="permission-title">
+          <span>🛡</span> System Permissions & Background Setup
+        </div>
+        <span class="brand-badge" id="permission-status-badge">
+          <span class="status-dot amber"></span> Setup Needed
+        </span>
+      </div>
+      <p class="permission-desc">
+        To ensure chime alerts play loud and clear and the timer continues ticking in the background when your screen locks or browser is minimized, please authorize system permissions:
+      </p>
+      <div class="permission-buttons">
+        <button class="perm-btn perm-btn-primary" id="btn-grant-all">
+          ✓ Authorize All Permissions
+        </button>
+        <button class="perm-btn" id="btn-enable-audio">
+          🔊 Enable Audio & Sound
+        </button>
+        <button class="perm-btn" id="btn-enable-notif">
+          🔔 Enable Background Notifications
+        </button>
+        <button class="perm-btn" id="btn-enable-wake">
+          ⚡ Keep Screen Awake
+        </button>
+      </div>
+    </section>
+
+    <!-- VIEW 1: TIMER INTERFACE -->
+    <section class="view-container active" id="view-timer">
+      <div class="timer-hero">
+
+        <!-- Central Timer Display Card -->
+        <div class="timer-center-card">
+
+          <!-- Active Stage Badge -->
+          <div class="session-badge mode-work" id="session-type-badge">
+            <span class="badge-pulse"></span> FOCUS SESSION
+          </div>
+
+          <!-- 4-Interval Tracker Steps -->
+          <div class="interval-tracker">
+            <div class="interval-pill active" title="Interval 1 (Focus -> 5m Short Break)"></div>
+            <div class="interval-pill" title="Interval 2 (Focus -> 5m Short Break)"></div>
+            <div class="interval-pill" title="Interval 3 (Focus -> 5m Short Break)"></div>
+            <div class="interval-pill long-break-target" title="Interval 4 (Focus -> Twice Beep -> 15m Long Break)"></div>
+          </div>
+          <div class="session-round-caption" id="session-round-indicator">
+            Interval 1 of 4 • Next up: 5m Short Break (Beep)
+          </div>
+
+          <!-- Circular Dial & Digital Display -->
+          <div class="timer-dial-wrapper">
+            <svg class="timer-svg" viewBox="0 0 320 320">
+              <defs>
+                <linearGradient id="gradient-work" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#ff7350" />
+                  <stop offset="100%" stop-color="#ff5430" />
+                </linearGradient>
+                <linearGradient id="gradient-break" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#ffd54f" />
+                  <stop offset="100%" stop-color="#dbba10" />
+                </linearGradient>
+                <linearGradient id="gradient-long" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#e2d4f5" />
+                  <stop offset="100%" stop-color="#b89ad6" />
+                </linearGradient>
+              </defs>
+
+              <!-- Background Track -->
+              <circle class="timer-svg-bg" cx="160" cy="160" r="130" stroke-width="8" fill="none" />
+              <!-- Active Animated Stroke -->
+              <circle class="timer-svg-progress" id="progress-ring-circle" cx="160" cy="160" r="130" stroke-width="8" fill="none" />
+            </svg>
+
+            <div class="timer-center-content">
+              <div class="countdown-digits" id="time-display">25:00</div>
+              <div class="countdown-caption" id="timer-status-caption">READY TO FOCUS</div>
+            </div>
+          </div>
+
+          <!-- Main Action Controls -->
+          <div class="controls-container">
+            <button class="btn-primary-action" id="btn-toggle">
+              <span id="btn-toggle-icon">▶</span>
+              <span id="btn-toggle-text">Start Focus</span>
+            </button>
+            <button class="btn-secondary-action" id="btn-skip" title="Skip to next session (Key: S)">
+              <span>⏭</span> Skip
+            </button>
+            <button class="btn-secondary-action" id="btn-reset" title="Reset current session (Key: R)">
+              <span>↺</span> Reset
+            </button>
+          </div>
+
+        </div>
+
+        <!-- SEPARATE DEDICATED SECTION: TIME & INTERVALS EDITOR -->
+        <div class="customizer-section">
+          <div class="customizer-header">
+            <div class="customizer-title">
+              <span>⚡</span> Time & Interval Customizer
+            </div>
+            <div class="customizer-subtitle">Directly set minutes or interval count</div>
+          </div>
+
+          <!-- Quick Presets -->
+          <div class="presets-row">
+            <button class="preset-chip active" id="preset-25">25m Focus</button>
+            <button class="preset-chip" id="preset-30">30m Focus</button>
+            <button class="preset-chip" id="preset-break-5">5m Short Break</button>
+            <button class="preset-chip" id="preset-break-15">15m Long Break</button>
+          </div>
+
+          <!-- Direct Editing Grid -->
+          <div class="customizer-grid">
+            <div class="custom-card">
+              <label class="custom-label">Focus Time</label>
+              <div class="custom-input-wrap">
+                <input type="number" id="quick-work-min" class="custom-input" min="1" max="180" value="25" />
+                <span class="custom-unit">min</span>
+              </div>
+            </div>
+
+            <div class="custom-card">
+              <label class="custom-label">Short Break</label>
+              <div class="custom-input-wrap">
+                <input type="number" id="quick-short-min" class="custom-input" min="1" max="60" value="5" />
+                <span class="custom-unit">min</span>
+              </div>
+            </div>
+
+            <div class="custom-card">
+              <label class="custom-label">Long Break</label>
+              <div class="custom-input-wrap">
+                <input type="number" id="quick-long-min" class="custom-input" min="1" max="120" value="15" />
+                <span class="custom-unit">min</span>
+              </div>
+            </div>
+
+            <div class="custom-card">
+              <label class="custom-label">Intervals</label>
+              <div class="custom-input-wrap">
+                <input type="number" id="quick-intervals" class="custom-input" min="2" max="12" value="4" />
+                <span class="custom-unit">cycles</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="customizer-footer">
+            <button class="perm-btn perm-btn-primary" id="btn-apply-custom">
+              ✓ Apply Changes to Timer
+            </button>
+            <span class="custom-hint">Auto-saves to settings</span>
+          </div>
+        </div>
+
+        <!-- DEDICATED ALERT VOLUME & SOUND CHECK WIDGET -->
+        <div class="sound-card" id="sound-card">
+          <div class="sound-card-header">
+            <div class="sound-card-title">
+              <span id="volume-icon">🔊</span>
+              <span>Chime Volume & Sound Check</span>
+            </div>
+            <div class="vol-indicator-badge">
+              <span id="volume-val">80%</span>
+            </div>
+          </div>
+
+          <div class="sound-controls-row">
+            <div class="vol-adjust-wrap">
+              <button class="vol-step-btn" id="btn-vol-down" title="Turn Volume Down (-10%)" aria-label="Decrease Volume">
+                <span>🔉 -</span>
+              </button>
+              <div class="vol-slider-wrap">
+                <input type="range" id="volume-slider" class="vol-slider" min="0" max="100" step="5" value="80" aria-label="Chime Volume Slider" />
+              </div>
+              <button class="vol-step-btn" id="btn-vol-up" title="Turn Volume Up (+10%)" aria-label="Increase Volume">
+                <span>🔊 +</span>
+              </button>
+            </div>
+
+            <button class="perm-btn perm-btn-primary check-sound-btn" id="btn-check-sound" title="Play chime to check sound at current volume">
+              <span class="btn-sound-icon">🔔</span>
+              <span id="btn-check-sound-text">Check Sound</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Bottom Utility Links -->
+        <div class="bottom-utility-bar">
+          <button class="util-link" id="btn-test-beep" title="Test acoustic single chime">
+            <span>🔔</span> Shortcut: Key M
+          </button>
+          <span style="color:var(--border-active);">•</span>
+          <span class="util-link" id="device-bg-indicator" title="Background persistence active">
+            <span id="bg-device-icon">⚡</span> <span id="bg-device-text">Background Ready</span>
+          </span>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- VIEW 2: MINIMALIST DASHBOARD & DAILY STATISTICS -->
+    <section class="view-container" id="view-dashboard">
+
+      <!-- Metrics KPI Cards -->
+      <div class="dashboard-grid">
+        <div class="stat-card">
+          <div class="stat-label">Today's Focus Time</div>
+          <div class="stat-number" id="stat-today-minutes">0m</div>
+          <div class="stat-subtext">Productive deep work</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-label">Completed Intervals</div>
+          <div class="stat-number" id="stat-today-sessions">0</div>
+          <div class="stat-subtext">Sessions logged</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-label">Day Streak</div>
+          <div class="stat-number" id="stat-streak">0 Days</div>
+          <div class="stat-subtext">Consistent focus</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-label">Daily Goal (8 Int.)</div>
+          <div class="stat-number" id="stat-completion-percent">0%</div>
+          <div class="stat-subtext">Progress to target</div>
+        </div>
+      </div>
+
+      <!-- Daily Target Bar -->
+      <div class="goal-progress-container">
+        <div class="goal-header">
+          <span class="goal-title">Daily Focus Target Progress</span>
+          <span class="goal-fraction">Target: 8 Sessions</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="stat-progress-bar"></div>
+        </div>
+      </div>
+
+      <!-- 7-Day Activity Chart -->
+      <div class="chart-section">
+        <div class="chart-header">
+          <div>
+            <div class="chart-title">Weekly Productivity Trend</div>
+            <div class="chart-subtitle">Focus minutes completed over the last 7 days</div>
+          </div>
+        </div>
+        <div class="chart-bars" id="weekly-chart-bars">
+          <!-- Populated dynamically by app.js -->
+        </div>
+      </div>
+
+      <!-- Completed Intervals History Log -->
+      <div class="history-section">
+        <div class="history-header">
+          <div>
+            <div class="history-title">Today's Interval Log</div>
+          </div>
+          <button class="perm-btn" id="btn-clear-history" style="font-size:0.72rem; padding:4px 10px;">
+            Clear Today
+          </button>
+        </div>
+        <div class="history-list" id="history-list">
+          <!-- Populated dynamically by app.js -->
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- SETTINGS MODAL -->
+  <div class="modal-overlay" id="modal-settings">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">Timer & Laptop Preferences</div>
+        <button class="icon-btn" id="btn-close-settings">✕</button>
+      </div>
+
+      <div class="setting-group">
+        <label class="setting-label">Focus Session Duration (minutes)</label>
+        <div class="setting-input-row">
+          <input type="number" id="input-work-min" class="setting-input" min="1" max="120" value="25" />
+          <span style="font-size:0.8rem; color:var(--text-muted);">(Default: 25 or 30 min)</span>
+        </div>
+      </div>
+
+      <div class="setting-group">
+        <label class="setting-label">Short Break Duration (minutes)</label>
+        <div class="setting-input-row">
+          <input type="number" id="input-short-break-min" class="setting-input" min="1" max="60" value="5" />
+          <span style="font-size:0.8rem; color:var(--text-muted);">(Default: 5 min)</span>
+        </div>
+      </div>
+
+      <div class="setting-group">
+        <label class="setting-label">Long Break Duration (minutes)</label>
+        <div class="setting-input-row">
+          <input type="number" id="input-long-break-min" class="setting-input" min="1" max="120" value="15" />
+          <span style="font-size:0.8rem; color:var(--text-muted);">(Default: 15 min after 3 short breaks)</span>
+        </div>
+      </div>
+
+      <div class="setting-group">
+        <label class="setting-label">Intervals Before Long Break</label>
+        <div class="setting-input-row">
+          <input type="number" id="input-target-intervals" class="setting-input" min="2" max="10" value="4" />
+          <span style="font-size:0.8rem; color:var(--text-muted);">(4 work sessions = 3 short breaks + 1 long break)</span>
+        </div>
+      </div>
+
+      <div class="setting-group">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <label class="setting-label" style="margin-bottom:0;">Alert Chime Volume</label>
+          <span id="settings-volume-val" style="font-family:var(--font-mono); font-size:0.85rem; color:var(--accent-work); font-weight:700;">80%</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <input type="range" id="settings-volume-slider" class="vol-slider" min="0" max="100" step="5" value="80" style="flex:1;" />
+          <button class="perm-btn" id="btn-settings-check-sound" style="padding:6px 12px; font-size:0.78rem;">
+            🔔 Check Sound
+          </button>
+        </div>
+      </div>
+
+      <hr style="border:none; border-top:1px solid var(--border-subtle); margin:18px 0;" />
+
+      <div class="setting-toggle-row">
+        <div>
+          <div style="font-size:0.85rem; font-weight:600; color:#fff;">Auto-start Breaks</div>
+          <div style="font-size:0.75rem; color:var(--text-muted);">Automatically start short & long breaks</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="toggle-auto-break" />
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-toggle-row">
+        <div>
+          <div style="font-size:0.85rem; font-weight:600; color:#fff;">Auto-start Focus Sessions</div>
+          <div style="font-size:0.75rem; color:var(--text-muted);">Automatically start work timer when break ends</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="toggle-auto-work" />
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <hr style="border:none; border-top:1px solid var(--border-subtle); margin:18px 0;" />
+
+      <div style="font-size:0.75rem; color:var(--text-dim); line-height:1.6;">
+        <strong>Laptop Keyboard Shortcuts:</strong><br />
+        • <kbd style="background:var(--bg-elevated); padding:2px 6px; border-radius:4px;">Space</kbd> Start / Pause<br />
+        • <kbd style="background:var(--bg-elevated); padding:2px 6px; border-radius:4px;">S</kbd> Skip session<br />
+        • <kbd style="background:var(--bg-elevated); padding:2px 6px; border-radius:4px;">R</kbd> Reset timer<br />
+        • <kbd style="background:var(--bg-elevated); padding:2px 6px; border-radius:4px;">M</kbd> Test acoustic single beep<br />
+        • <kbd style="background:var(--bg-elevated); padding:2px 6px; border-radius:4px;">D</kbd> Toggle Dashboard
+      </div>
+
+      <div class="modal-footer">
+        <button class="perm-btn perm-btn-primary" id="btn-save-settings" onclick="window.pomodoroApp.closeSettings()">
+          Done
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="shader-background.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
