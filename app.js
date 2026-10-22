@@ -78,63 +78,85 @@
       }
     }
 
-    // Play crisp acoustic chime / alert scaled by current volume
-    // count: 1 (single chime) or 2 (double chime)
-    playBeep(count = 1) {
-      this.init();
-      if (!this.ctx) return;
-
+    // Play single synthesized acoustic chime note
+    _playTone(startTime, primaryFreq, secondaryFreq, duration, peakMultiplier = 1.0, type1 = 'triangle', type2 = 'sine') {
+      if (!this.ctx || this.volume <= 0.001) return;
       const vol = this.volume;
-      if (vol <= 0.001) return; // Muted
 
-      const playChimeNote = (startTime, primaryFreq = 1046.5, secondaryFreq = 2093.0, duration = 0.55) => {
-        // Fundamental oscillator (triangle wave has warmer audible harmonics than sine)
-        const osc1 = this.ctx.createOscillator();
-        const gain1 = this.ctx.createGain();
+      const osc1 = this.ctx.createOscillator();
+      const gain1 = this.ctx.createGain();
+      const osc2 = this.ctx.createOscillator();
+      const gain2 = this.ctx.createGain();
 
-        // Overtone harmonic oscillator for clarity on laptop/phone speakers
-        const osc2 = this.ctx.createOscillator();
-        const gain2 = this.ctx.createGain();
+      osc1.type = type1;
+      osc1.frequency.setValueAtTime(primaryFreq, startTime);
 
-        osc1.type = 'triangle';
-        osc1.frequency.setValueAtTime(primaryFreq, startTime); // C6 bell tone
+      osc2.type = type2;
+      osc2.frequency.setValueAtTime(secondaryFreq, startTime);
 
-        osc2.type = 'sine';
-        osc2.frequency.setValueAtTime(secondaryFreq, startTime); // High crystal sparkle
+      const peak1 = 0.75 * vol * peakMultiplier;
+      const peak2 = 0.35 * vol * peakMultiplier;
 
-        // Punchy, clear attack and smooth resonant decay scaled by volume
-        const peak1 = 0.75 * vol;
-        const peak2 = 0.35 * vol;
+      gain1.gain.setValueAtTime(0.0001, startTime);
+      gain1.gain.linearRampToValueAtTime(peak1, startTime + 0.012);
+      gain1.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
 
-        gain1.gain.setValueAtTime(0.0001, startTime);
-        gain1.gain.linearRampToValueAtTime(peak1, startTime + 0.012);
-        gain1.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+      gain2.gain.setValueAtTime(0.0001, startTime);
+      gain2.gain.linearRampToValueAtTime(peak2, startTime + 0.01);
+      gain2.gain.exponentialRampToValueAtTime(0.0001, startTime + (duration * 0.75));
 
-        gain2.gain.setValueAtTime(0.0001, startTime);
-        gain2.gain.linearRampToValueAtTime(peak2, startTime + 0.01);
-        gain2.gain.exponentialRampToValueAtTime(0.0001, startTime + (duration * 0.7));
+      osc1.connect(gain1);
+      gain1.connect(this.ctx.destination);
+      osc2.connect(gain2);
+      gain2.connect(this.ctx.destination);
 
-        osc1.connect(gain1);
-        gain1.connect(this.ctx.destination);
+      osc1.start(startTime);
+      osc1.stop(startTime + duration + 0.05);
+      osc2.start(startTime);
+      osc2.stop(startTime + duration + 0.05);
+    }
 
-        osc2.connect(gain2);
-        gain2.connect(this.ctx.destination);
-
-        osc1.start(startTime);
-        osc1.stop(startTime + duration + 0.05);
-
-        osc2.start(startTime);
-        osc2.stop(startTime + duration + 0.05);
-      };
-
+    // 1. UNIQUE SOUND: POMODORO FOCUS STARTING (Bright, crisp ascending 3-note chime: C5 -> G5 -> C6)
+    playFocusChime() {
+      this.init();
+      if (!this.ctx || this.volume <= 0.001) return;
       const now = this.ctx.currentTime + 0.02;
-      if (count === 1) {
-        // High, distinct single chime (C6 = 1046.5Hz)
-        playChimeNote(now, 1046.5, 2093.0, 0.55);
-      } else if (count === 2) {
-        // Double ascending chime (C6 -> E6 = 1318.5Hz) for long break
-        playChimeNote(now, 1046.5, 2093.0, 0.45);
-        playChimeNote(now + 0.28, 1318.5, 2637.0, 0.65);
+      this._playTone(now, 523.25, 1046.5, 0.32, 0.9);
+      this._playTone(now + 0.14, 783.99, 1567.98, 0.38, 0.95);
+      this._playTone(now + 0.30, 1046.5, 2093.0, 0.65, 1.1);
+    }
+
+    // 2. UNIQUE SOUND: SHORT BREAK STARTING (Gentle, mellow descending relaxing chime: E6 -> B5 -> G5)
+    playBreakChime() {
+      this.init();
+      if (!this.ctx || this.volume <= 0.001) return;
+      const now = this.ctx.currentTime + 0.02;
+      this._playTone(now, 1318.5, 2637.0, 0.40, 0.85, 'sine', 'sine');
+      this._playTone(now + 0.18, 987.77, 1975.5, 0.45, 0.85, 'sine', 'triangle');
+      this._playTone(now + 0.38, 783.99, 1567.98, 0.70, 0.9, 'triangle', 'sine');
+    }
+
+    // 3. UNIQUE SOUND: LONG INTERVAL STARTING (Rich celebratory fanfare: C5 -> E5 -> G5 -> C6 with deep resonance)
+    playLongBreakChime() {
+      this.init();
+      if (!this.ctx || this.volume <= 0.001) return;
+      const now = this.ctx.currentTime + 0.02;
+      this._playTone(now, 523.25, 1046.5, 0.40, 0.85);
+      this._playTone(now + 0.15, 659.25, 1318.5, 0.45, 0.9);
+      this._playTone(now + 0.32, 783.99, 1567.98, 0.50, 0.95);
+      this._playTone(now + 0.52, 1046.5, 2093.0, 0.95, 1.2);
+    }
+
+    // Backward-compatible dispatcher
+    playBeep(type = 1) {
+      if (type === 'work' || type === 'focus') {
+        this.playFocusChime();
+      } else if (type === 'shortBreak' || type === 'break' || type === 1) {
+        this.playBreakChime();
+      } else if (type === 'longBreak' || type === 2) {
+        this.playLongBreakChime();
+      } else {
+        this.playBreakChime();
       }
     }
   }
@@ -550,6 +572,9 @@
       this.btnVolUp = document.getElementById('btn-vol-up');
       this.btnCheckSound = document.getElementById('btn-check-sound');
       this.btnCheckSoundText = document.getElementById('btn-check-sound-text');
+      this.btnSoundFocus = document.getElementById('btn-sound-focus');
+      this.btnSoundBreak = document.getElementById('btn-sound-break');
+      this.btnSoundLong = document.getElementById('btn-sound-long');
       this.settingsVolumeSlider = document.getElementById('settings-volume-slider');
       this.settingsVolumeVal = document.getElementById('settings-volume-val');
       this.btnSettingsCheckSound = document.getElementById('btn-settings-check-sound');
@@ -570,7 +595,7 @@
       // Permission buttons
       this.btnEnableAudio?.addEventListener('click', () => {
         this.audio.init();
-        this.audio.playBeep(1);
+        this.audio.playFocusChime();
         this.checkPermissionsStatus();
       });
 
@@ -587,7 +612,7 @@
 
       this.btnGrantAll?.addEventListener('click', async () => {
         this.audio.init();
-        this.audio.playBeep(1);
+        this.audio.playFocusChime();
         await this.system.requestNotificationPermission();
         await this.system.requestWakeLock();
         this.system.notify('Pulse Pomodoro', 'All system permissions granted! Ready to focus.');
@@ -599,7 +624,7 @@
       this.btnSkip.addEventListener('click', () => this.skipSession());
       this.btnReset.addEventListener('click', () => this.resetTimer());
       this.btnTestBeep?.addEventListener('click', () => {
-        this.audio.playBeep(1);
+        this.audio.playFocusChime();
       });
 
       // Alert Volume Slider & Step Buttons
@@ -623,6 +648,23 @@
       // Sound Check Action Buttons (Immediate Audio & Haptic check)
       this.btnCheckSound?.addEventListener('click', () => this.checkSound());
       this.btnSettingsCheckSound?.addEventListener('click', () => this.checkSound());
+
+      // 3 Unique Sounds Interactive Preview Buttons
+      this.btnSoundFocus?.addEventListener('click', () => {
+        this.audio.init();
+        this.audio.playFocusChime();
+        this.system.vibrate([100]);
+      });
+      this.btnSoundBreak?.addEventListener('click', () => {
+        this.audio.init();
+        this.audio.playBreakChime();
+        this.system.vibrate([100]);
+      });
+      this.btnSoundLong?.addEventListener('click', () => {
+        this.audio.init();
+        this.audio.playLongBreakChime();
+        this.system.vibrate([150, 80, 150]);
+      });
 
       // Mobile & Web Background Lifecycle Handlers (Drift-proof recovery)
       document.addEventListener('visibilitychange', () => {
@@ -858,13 +900,20 @@
       if (this.isRunning) {
         this.stopTimer();
       } else {
-        this.startTimer();
+        this.startTimer(true); // play sound when starting
       }
     }
 
-    async startTimer() {
+    async startTimer(playSound = false) {
       this.isRunning = true;
       this.targetEndTime = Date.now() + this.timeRemaining * 1000;
+
+      // Play corresponding unique sound on start
+      if (playSound) {
+        if (this.mode === 'work') this.audio.playFocusChime();
+        else if (this.mode === 'shortBreak') this.audio.playBreakChime();
+        else if (this.mode === 'longBreak') this.audio.playLongBreakChime();
+      }
 
       // Ask for notification permission on start if default
       if (!this.system.isElectron && 'Notification' in window && Notification.permission === 'default') {
@@ -931,99 +980,88 @@
       }
     }
 
-    // THE CRITICAL WORKFLOW SPECIFIED BY THE USER:
-    // 1. Work Session ends -> 1 BEEP -> Automatically start 5 min break.
-    // 2. 5 min break ends -> 1 BEEP -> Automatically start Work Session.
-    // 3. Repeats for 3 intervals (round 1 work/break, round 2 work/break, round 3 work/break).
-    // 4. On completing the 4th interval (work session 4, after 3 short breaks) -> TWICE BEEP -> Automatically start 15 min long break!
-    // 5. After 15 min long break -> 1 BEEP -> Automatically restarts interval 1.
-    completeSession(isSkipped = false, wasRunning = false) {
+    // CONTINUOUS AUTOMATIC FLOW WITH 3 UNIQUE ACOUSTIC CHIMES:
+    // 1. Pomodoro Focus ends -> Plays Break Chime -> Switches to & starts Short Break (e.g. 5m)
+    // 2. Short Break ends -> Increments round -> Plays Focus Chime -> Switches to & starts next Focus Session
+    // 3. Repeat flow until target intervals (round 1 work -> break 1, round 2 work -> break 2, round 3 work -> break 3)
+    // 4. On completing target intervals (Interval 4 Focus) -> Plays Long Break Fanfare -> Switches to & starts Long Break (e.g. 15m)
+    // 5. Long Break ends -> Resets round to 1 -> Plays Focus Chime -> Switches to & starts fresh Focus Session!
+    completeSession(isSkipped = false, wasRunning = true) {
       this.system.vibrate([280, 120, 280]);
       const finishedMode = this.mode;
       const finishedMinutes = this.totalDuration / 60;
 
-      // Log statistics if finished naturally or user focused
+      // Log statistics
       if (!isSkipped || finishedMode === 'work') {
         this.stats.recordSession(finishedMode, finishedMinutes);
         this.renderDashboard();
       }
 
-      // Automatically chain into next session without requiring manual Start click
-      const shouldAutoRun = !isSkipped || wasRunning;
-
       if (finishedMode === 'work') {
-        // Did we just finish interval 4 (or config.targetIntervals)?
+        // Did we just finish the final interval target?
         if (this.round >= this.config.targetIntervals) {
-          // USER SPECIFICATION: 4th interval finished -> TWICE BEEP -> 15 min long break
-          this.audio.playBeep(2); // TWICE BEEP!
+          // Transition to LONG BREAK with unique Long Break Sound
+          this.mode = 'longBreak';
+          const longBreakSecs = Number(this.config.longBreakDuration) || 15 * 60;
+          this.totalDuration = longBreakSecs;
+          this.timeRemaining = longBreakSecs;
+
+          this.audio.playLongBreakChime(); // UNIQUE SOUND 3: LONG INTERVAL
           this.system.notify(
-            '🌟 4 Intervals Completed! Long Break Time',
-            'Spectacular focus! Entering 15 min long break. (Twice beep played)'
+            '🌟 All Intervals Complete! Long Break Time',
+            'Spectacular focus! Automatically starting 15m long break. (Long break sound played)'
           );
 
-          // Transition to Long Break
-          this.mode = 'longBreak';
-          this.totalDuration = this.config.longBreakDuration;
-          this.timeRemaining = this.config.longBreakDuration;
-
-          // Seamlessly auto-start long break
-          if (shouldAutoRun || this.config.autoStartBreaks !== false) {
-            this.startTimer();
-          }
+          // Automatically run the long break
+          this.startTimer(false);
         } else {
-          // Standard interval finished (1, 2, or 3) -> 1 single clean beep -> 5 min short break
-          this.audio.playBeep(1); // 1 single clean beep
+          // Standard interval finished -> Transition to SHORT BREAK with unique Break Sound
+          this.mode = 'shortBreak';
+          const shortBreakSecs = Number(this.config.shortBreakDuration) || 5 * 60;
+          this.totalDuration = shortBreakSecs;
+          this.timeRemaining = shortBreakSecs;
+
+          this.audio.playBreakChime(); // UNIQUE SOUND 2: BREAK TIME
           this.system.notify(
             `🔔 Focus Interval ${this.round} Complete`,
-            `Time for a 5-minute restorative short break! (Single beep played)`
+            `Great work! Automatically starting 5m short break. (Break sound played)`
           );
 
-          // Transition to Short Break
-          this.mode = 'shortBreak';
-          this.totalDuration = this.config.shortBreakDuration;
-          this.timeRemaining = this.config.shortBreakDuration;
-
-          // Seamlessly auto-start short break
-          if (shouldAutoRun || this.config.autoStartBreaks !== false) {
-            this.startTimer();
-          }
+          // Automatically run the short break
+          this.startTimer(false);
         }
       } else if (finishedMode === 'shortBreak') {
-        // Short break ended -> Single beep -> advance round -> Work session
-        this.audio.playBeep(1); // 1 single clean beep
+        // Short break ended -> advance interval round -> Transition to FOCUS
         this.round += 1;
+        this.mode = 'work';
+        const workSecs = Number(this.config.workDuration) || 25 * 60;
+        this.totalDuration = workSecs;
+        this.timeRemaining = workSecs;
 
+        this.audio.playFocusChime(); // UNIQUE SOUND 1: POMODORO FOCUS
         this.system.notify(
           `⚡ Short Break Over (Interval ${this.round} of ${this.config.targetIntervals})`,
-          `Ready to dive back into deep focus! (Single beep played)`
+          `Time to focus! Starting Interval ${this.round}. (Pomodoro sound played)`
         );
 
-        this.mode = 'work';
-        this.totalDuration = this.config.workDuration;
-        this.timeRemaining = this.config.workDuration;
-
-        // Seamlessly auto-start next focus session
-        if (shouldAutoRun || this.config.autoStartFocus !== false) {
-          this.startTimer();
-        }
+        // Automatically run the next focus session
+        this.startTimer(false);
       } else if (finishedMode === 'longBreak') {
-        // Long break finished -> Single beep -> Reset cycle to round 1
-        this.audio.playBeep(1); // 1 single clean beep
+        // Long break finished -> Reset interval cycle to 1 -> Transition to FOCUS
         this.round = 1;
+        this.mode = 'work';
+        const workSecs = Number(this.config.workDuration) || 25 * 60;
+        this.totalDuration = workSecs;
+        this.timeRemaining = workSecs;
 
+        this.audio.playFocusChime(); // UNIQUE SOUND 1: POMODORO FOCUS
         this.system.notify(
           '🎯 Cycle Complete & Refreshed!',
-          'Long break finished. Starting a fresh 4-interval cycle. (Single beep played)'
+          'Long break finished. Starting a fresh 4-interval cycle. (Pomodoro sound played)'
         );
 
-        this.mode = 'work';
-        this.totalDuration = this.config.workDuration;
-        this.timeRemaining = this.config.workDuration;
-
-        // Seamlessly auto-start fresh focus session
-        if (shouldAutoRun || this.config.autoStartFocus !== false) {
-          this.startTimer();
-        }
+        // Automatically run fresh focus session
+        this.startTimer(false);
       }
 
       this.updateUI();
@@ -1052,21 +1090,36 @@
       // Update Session Type Badge
       this.sessionTypeBadge.className = `session-badge mode-${this.mode}`;
       if (this.mode === 'work') {
-        this.sessionTypeBadge.innerHTML = `<span class="badge-pulse"></span> FOCUS SESSION`;
+        const durMin = Math.round(this.totalDuration / 60);
+        this.sessionTypeBadge.innerHTML = `<span class="badge-pulse"></span> FOCUS SESSION (${durMin}m)`;
       } else if (this.mode === 'shortBreak') {
-        this.sessionTypeBadge.innerHTML = `<span class="badge-pulse"></span> SHORT BREAK (5m)`;
+        const durMin = Math.round(this.totalDuration / 60);
+        this.sessionTypeBadge.innerHTML = `<span class="badge-pulse"></span> SHORT BREAK (${durMin}m)`;
       } else {
-        this.sessionTypeBadge.innerHTML = `<span class="badge-pulse"></span> LONG BREAK (15m)`;
+        const durMin = Math.round(this.totalDuration / 60);
+        this.sessionTypeBadge.innerHTML = `<span class="badge-pulse"></span> LONG BREAK (${durMin}m)`;
+      }
+
+      // Keep preset chip highlights in sync with current mode
+      [this.preset25, this.preset30, this.presetBreak5, this.presetBreak15].forEach(btn => btn?.classList.remove('active'));
+      if (this.mode === 'work') {
+        const m = Math.round(this.totalDuration / 60);
+        if (m === 25) this.preset25?.classList.add('active');
+        else if (m === 30) this.preset30?.classList.add('active');
+      } else if (this.mode === 'shortBreak') {
+        this.presetBreak5?.classList.add('active');
+      } else if (this.mode === 'longBreak') {
+        this.presetBreak15?.classList.add('active');
       }
 
       // Round indicator caption
       if (this.mode === 'work') {
-        const nextBreakType = this.round >= this.config.targetIntervals ? '15m Long Break (Twice Beep)' : '5m Short Break (Beep)';
+        const nextBreakType = this.round >= this.config.targetIntervals ? '15m Long Break' : '5m Short Break';
         this.sessionRoundIndicator.textContent = `Interval ${this.round} of ${this.config.targetIntervals} • Next up: ${nextBreakType}`;
       } else if (this.mode === 'shortBreak') {
-        this.sessionRoundIndicator.textContent = `Short Break ${this.round} of 3 • Next: Focus Interval ${this.round + 1}`;
+        this.sessionRoundIndicator.textContent = `Short Break (Interval ${this.round} done) • Next: Focus Interval ${this.round + 1}`;
       } else {
-        this.sessionRoundIndicator.textContent = `Long Break (After 3 Short Breaks) • Cycle Completed`;
+        this.sessionRoundIndicator.textContent = `Long Break (${this.config.targetIntervals} intervals done) • Next: Cycle 1`;
       }
 
       // Interval step pills
@@ -1112,21 +1165,25 @@
       if (this.isRunning) {
         this.btnToggle.classList.add('running');
         this.btnToggleIcon.textContent = '⏸';
-        this.btnToggleText.textContent = 'Pause';
+        this.btnToggleText.textContent = this.mode === 'work' ? 'Pause Focus' : 'Pause Break';
       } else {
         this.btnToggle.classList.remove('running');
         this.btnToggleIcon.textContent = '▶';
-        this.btnToggleText.textContent = this.timeRemaining < this.totalDuration ? 'Resume' : 'Start Focus';
+        if (this.timeRemaining < this.totalDuration) {
+          this.btnToggleText.textContent = 'Resume';
+        } else {
+          this.btnToggleText.textContent = this.mode === 'work' ? 'Start Focus' : (this.mode === 'shortBreak' ? 'Start Break' : 'Start Long Break');
+        }
       }
 
       // Status Caption Update
       if (this.timerStatusCaption) {
         if (this.isRunning) {
-          this.timerStatusCaption.textContent = this.mode === 'work' ? 'DEEP FOCUSING' : 'REST & RECHARGE';
+          this.timerStatusCaption.textContent = this.mode === 'work' ? 'DEEP FOCUSING' : (this.mode === 'shortBreak' ? 'REST & RECHARGE' : 'EXTENDED RECHARGE');
         } else if (this.timeRemaining < this.totalDuration) {
           this.timerStatusCaption.textContent = 'PAUSED';
         } else {
-          this.timerStatusCaption.textContent = 'READY TO FOCUS';
+          this.timerStatusCaption.textContent = this.mode === 'work' ? 'READY TO FOCUS' : 'READY FOR BREAK';
         }
       }
 
